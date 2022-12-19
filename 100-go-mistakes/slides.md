@@ -89,7 +89,8 @@ class: text-center
 默认我们已经知道的规则
 
 ---
-
+clicks: 6
+---
 # Slice基础
 
 <div class="grid grid-cols-2 gap-x-4">
@@ -335,6 +336,89 @@ select {}
 </div>
 </div>
 
+
+---
+
+# Map结构
+
+<div class="grid grid-cols-2 gap-x-10">
+<div class="col-span-1">
+```go
+// A header for a Go map.
+type hmap struct {
+    // 元素个数，调用 len(map) 时，直接返回此值
+	count     int
+	flags     uint8
+	// buckets 的对数 log_2
+	B         uint8
+	// overflow 的 bucket 近似数
+	noverflow uint16
+	// 计算 key 的哈希的时候会传入哈希函数
+	hash0     uint32
+    // 指向 buckets 数组，大小为 2^B
+    // 如果元素个数为0，就为 nil
+	buckets    unsafe.Pointer
+	// 扩容的时候，buckets 长度会是 oldbuckets 的两倍
+	oldbuckets unsafe.Pointer
+	// 指示扩容进度，小于此地址的 buckets 迁移完成
+	nevacuate  uintptr
+	extra *mapextra // optional fields
+}
+```
+</div>
+<div class="col-span-1">
+<img style="width:100%" src="/public/map_struct.png" />
+</div>
+</div>
+
+---
+
+# bmap结构
+
+<div class="grid grid-cols-2 gap-x-10">
+<div class="col-span-1">
+我们在go源码中可以看到bmap结构：
+```go
+type bmap struct {
+	tophash [bucketCnt]uint8
+}
+```
+但是在编译期间，编译会改变这个结构：
+```go
+type bmap struct {
+    topbits  [8]uint8
+    keys     [8]keytype
+    values   [8]valuetype
+    pad      uintptr
+    overflow uintptr
+}
+```
+</div>
+<div class="col-span-1">
+<img style="height:90%" src="/public/bmap_struct.png" />
+</div>
+</div>
+
+---
+
+### map中定位key
+<div class="grid grid-cols-2 gap-x-10">
+
+<div class="col-span-1">
+<img style="height:90%" src="/public/map_find_key.png" />
+</div>
+<div class="mt-10 col-span-1">
+
+1、首先对key进行hash
+
+2、获取hash后的值的后B位确定bucket
+
+3、根据tophash确定key在桶中的位置
+
+4、如果没有找到并且overflow指针为空，就继续寻找直到找到key, 或者找完为止
+
+</div>
+</div>
 ---
 layout: center
 class: text-center pb-5
