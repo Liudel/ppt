@@ -85,7 +85,7 @@ layout: center
 class: text-center
 ---
 
-# 数据结构
+# 1、数据结构
 默认我们已经知道的规则
 
 ---
@@ -419,6 +419,292 @@ type bmap struct {
 
 </div>
 </div>
+
+---
+
+# Map容量调整
+##
+1、扩容时容量翻倍，申请一个新的数组，采用渐进式哈希的方式进行迁移 
+
+2、迁移过程中支持读写：
+- 新增kv只写新表
+- 修改和删除双写，保证新老表中的数据一致
+- 读取时优先读老表，再读新表
+  
+3、迁移过程为每次update/remove操作时触发部分搬迁，每次搬迁2部分bucket中的数据：
+- 修改的key所在的当前Bucket
+- 按照顺序搬迁的一个Bucket（避免某些bucket一直未被访问导致无法搬迁成功）
+
+4、直到所有数据搬迁完成后，删除oldBuckets，使得老哈希表中的Bucket对象被GC回收
+
+---
+clicks: 1
+---
+
+# map扩容的条件
+- 装载因子超过阈值，源码里定义的阈值是 6.5
+  - `loadFactor := count / (2^B)`
+- overflow 的 bucket 数量过多：当 B 小于 15，也就是 bucket 总数 2^B 小于 2^15 时，如果 overflow 的 bucket 数量超过 2^B；当 B >= 15，也就是 bucket 总数 2^B 大于等于 2^15，如果 overflow 的 bucket 数量超过 2^15。
+ <v-click at="0">
+  <img v-click-hide="1" style="position:absolute;width:60%;left:25vh;top:35vh"  src="/public/map_grow.png">
+</v-click>
+<v-click at="1">
+  <img  v-click-hide="2"  style="position:absolute;width:50%;left:25vh;top:37vh"  src="/public/map_qy.png">
+</v-click>
+
+<!--
+第 1 点：我们知道，每个 bucket 有 8 个空位，在没有溢出，且所有的桶都装满了的情况下，装载因子算出来的结果是 8。因此当装载因子超过 6.5 时，表明很多 bucket 都快要装满了，查找效率和插入效率都变低了。在这个时候进行扩容是有必要的。
+
+第 2 点：是对第 1 点的补充。就是说在装载因子比较小的情况下，这时候 map 的查找和插入效率也很低，而第 1 点识别不出来这种情况。表面现象就是计算装载因子的分子比较小，即 map 里元素总数少，但是 bucket 数量多（真实分配的 bucket 数量多，包括大量的 overflow bucket）。
+
+不难想像造成这种情况的原因：不停地插入、删除元素。先插入很多元素，导致创建了很多 bucket，但是装载因子达不到第 1 点的临界值，未触发扩容来缓解这种情况。之后，删除元素降低元素总数量，再插入很多元素，导致创建很多的 overflow bucket，但就是不会触犯第 1 点的规定，你能拿我怎么办？overflow bucket 数量太多，导致 key 会很分散，查找插入效率低得吓人，因此出台第 2 点规定。这就像是一座空城，房子很多，但是住户很少，都分散了，找起人来很困难。
+
+
+
+对于条件 1，元素太多，而 bucket 数量太少，很简单：将 B 加 1，bucket 最大数量（2^B）直接变成原来 bucket 数量的 2 倍。于是，就有新老 bucket 了。注意，这时候元素都在老 bucket 里，还没迁移到新的 bucket 来。而且，新 bucket 只是最大数量变为原来最大数量（2^B）的 2 倍（2^B * 2）。
+
+对于条件 2，其实元素没那么多，但是 overflow bucket 数特别多，说明很多 bucket 都没装满。解决办法就是开辟一个新 bucket 空间，将老 bucket 中的元素移动到新 bucket，使得同一个 bucket 中的 key 排列地更紧密。这样，原来，在 overflow bucket 中的 key 可以移动到 bucket 中来。结果是节省空间，提高 bucket 利用率，map 的查找和插入效率自然就会提升。
+-->
+
+---
+layout: center
+
+class: text-center
+---
+
+# 2、控制流
+
+---
+
+# for循环
+
+### go range语法糖
+<div class="grid grid-cols-2 gap-x-10">
+<div class="col-span-1">
+```go
+a := []int{-1}
+for i := range a {
+  a = append(a, i)
+}
+fmt.Println(a)
+```
+</div>
+<div class="col-span-1">
+```go
+a := []int{-1}
+for i := 0; i < len(a); i++ {
+  a = append(a, i)
+}
+fmt.Println(a)
+```
+</div>
+<div v-click class="col-span-1 mt-5">
+1、输出[-1, 0]
+</div>
+<div v-click class="col-span-1 mt-5">
+2、程序死循环
+</div>
+<div v-click class="col-span-1 mt-5">
+```go
+arr := [2]int{1, 2}
+res := []*int{}
+for _, v := range arr {
+  res = append(res, &v)
+}
+
+fmt.Println(res)
+```
+</div>
+<div v-click="5" class="col-span-1 mt-5">
+```go
+// The loop we generate:
+//   len_temp := len(range)
+//   range_temp := range
+//   for index_temp = 0; index_temp < len_temp; index_temp++ {
+//           value_temp = range_temp[index_temp]
+//           index = index_temp
+//           value = value_temp
+//           original body
+//   }
+```
+</div>
+<div v-click="4" class="col-span-1">
+3、输出两个一样的地址
+</div>
+
+</div>
+
+---
+layout: center
+
+class: text-center
+---
+
+# 3、函数
+
+---
+
+# 灵活对函数进行类型转换
+
+<div class="grid grid-cols-2 gap-x-10">
+<div class="col-span-1">
+1、我现在有这样一个函数
+```go
+func MyAdd(x, y int) int {
+	return x + y
+}
+```
+
+2、现在我们需要实现这个接口
+```go
+type BinaryAdder interface {
+	Add(int, int) int
+}
+```
+<div v-click>
+3、我们当然不去写一个Add函数调用MyAdd函数
+```go
+type BinaryAdder interface {
+	Add(int, int) int
+}
+
+type BinaryAdderFunc func(int, int) int
+
+func (f BinaryAdderFunc) Add(x, y int) int {
+	return f(x, y)
+}
+```
+</div>
+</div>
+<div v-click=2 class="col-span-1">
+4、你会问这样有什么不一样的吗
+```go
+// net/http/server.go 
+type Handler interface {
+	ServeHTTP(ResponseWriter, *Request)
+}
+
+// 魔法！
+type HandlerFunc func(ResponseWriter, *Request)
+
+// ServeHTTP calls f(w, r).
+func (f HandlerFunc) ServeHTTP(w ResponseWriter, r *Request) {
+	f(w, r)
+}
+```
+<div v-click=3>
+5、我们实现http就是用这种方式实现的
+```go
+func greeting(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "Welcome, Gopher!\n")
+}
+
+func main() {
+  http.ListenAndServe(":8080", http.HandlerFunc(greeting))
+}
+```
+</div>
+</div>
+</div>
+
+---
+layout: center
+
+class: text-center
+---
+
+# 4、结构体
+
+
+---
+
+# 内嵌结构体
+
+```go
+type StructB struct {
+    A // A is another struct
+}
+```
+
+内嵌结构体是Go提供一种介于继承和组合之间的折中方案。
+
+外层的结构体完全复制了里层的结构体的方法。
+
+缺点:
+
+**内嵌结构体最大的特点以及缺点就是暴露了被潜入结构体的方法，哪怕这些方法并不想被外面的调用者使用。**
+```go
+type SMap struct {
+  sync.Mutex // 内嵌Mutex
+  data map[string]string
+}
+func (m *SMap) Get(k string) string {
+  m.Lock()
+  defer m.Unlock()
+
+  return m.data[k]
+}
+```
+
+---
+
+# method的本质
+##
+
+`method`就是以`receiver`作为第一个参数的函数。没错，method就是函数。
+<div class="grid grid-cols-2 gap-x-10">
+<div class="col-span-1">
+```go
+type Person struct {
+	Name string
+}
+
+// value method
+func (p Person) GetName() string {
+	return p.Name
+}
+
+// pointer receiver
+func (p *Person) SetName(name string) {
+	p.Name = name
+}
+```
+```go
+func package_Person_GetName(p Person) string{
+  return p.Name
+}
+
+func package_Person_SetName(p *Person) {
+  p.Name = name
+}
+```
+</div>
+<div v-click class="col-span-1">
+```go
+type customer struct {
+	data *data
+}
+
+type data struct {
+	balance float64
+}
+
+func (c customer) add(operation float64) {
+	c.data.balance += operation
+}
+
+func main() {
+	c := customer{data: &data{
+		balance: 100,
+	}}
+	c.add(50.)
+	fmt.Printf("balance: %.2f\n", c.data.balance)
+}
+```
+</div>
+
+</div>
+
 ---
 layout: center
 class: text-center pb-5
