@@ -383,7 +383,7 @@ type bmap struct {
 	tophash [bucketCnt]uint8
 }
 ```
-但是在编译期间，编译会改变这个结构：
+但是在编译期间，编译器会改变这个结构：
 ```go
 type bmap struct {
     topbits  [8]uint8
