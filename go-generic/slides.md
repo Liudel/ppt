@@ -11,7 +11,7 @@ lineNumbers: true
 
 ---
 
-# GO范型
+# GO泛型
 
 跟着 Go 作者学泛型
 
@@ -31,7 +31,7 @@ lineNumbers: true
 
 ---
 
-# go没有范型的模样
+# go没有泛型的模样
 
 ```go
 func StrSliceToUintSlice(arr []string) ([]uint64, error) {
@@ -88,7 +88,7 @@ layout: center
 <div class="grid grid-cols-2 gap-x-4">
 <div class="mt-8 col-span-1">
 
-##### 非范型版本的最小值函数
+##### 非泛型版本的最小值函数
 ```go
 func min(x, y float64) float64 {
   if x < y {
@@ -100,7 +100,7 @@ func min(x, y float64) float64 {
 </div>
 <div v-click class="mt-8 col-span-1">
 
-##### 范型版本的最小值函数
+##### 泛型版本的最小值函数
 ```go
 func min[T Ordered](x, y T) T {
   if x < y {
@@ -199,7 +199,7 @@ func Test(ig IGet) {
 }
 
 ```
-在范型中我们也可以限制范型的中的类型
+在泛型中我们也可以限制泛型的中的类型
 ```go
 type Ordered interface {
   int | float64 | ~string
@@ -315,7 +315,7 @@ layout: center
 
 ---
 
-# 4.1、不支持范型方法
+# 4.1、不支持泛型方法
 ## 
 
 主要原因Go泛型的处理是在编译的时候实现的，泛型方法在编译的时候，如果没有上下文的分析推断，很难判断泛型方案该如何实例化，甚至判断不了，导致目前(Go 1.18)Go实现中不支持泛型方案
@@ -330,7 +330,7 @@ type Querier struct{
 func (q *Querier) All[T any](ctx context) ([]T, error) { return nil, nil } // method must have no type parameters
 ```
 
-我们要想实现Client，只能在结构上加范型：
+我们要想实现Client，只能在结构上加泛型：
 ```go
 type Querier[T any] struct {
 	client *Client
