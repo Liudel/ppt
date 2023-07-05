@@ -243,6 +243,16 @@ layout: center
 <div class="grid grid-cols-2 gap-x-4">
 <div class="mt-8 col-span-1">
 ```go
+// 在调用泛型函数时，提供类型实参感觉有点多余。
+// Go 虽然是静态类型语言，但擅长类型推断。
+// 因此泛型这里，Go 也实现了类型推断。
+// 在这理不需要提供类型实参 m = min[int](a, b)
+var a, b, m int
+m = min(a, b)
+```
+```go
+// 这个函数的目的是希望对 s 中的每个元素都乘以参数 c，
+// 最后返回一个新的切片。
 func Scale[E constraints.Integer](s []E, c E) []E {
 	r := make([]E, len(s))
 	for i, v := range s {
@@ -250,16 +260,26 @@ func Scale[E constraints.Integer](s []E, c E) []E {
 	}
 	return r
 }
+```
 
+```go
+// 定义一个结构体
 type Point []int32
 
 func (p Point) String() string {
 	return "point"
 }
+```
 
+</div>
+<div class="mt-8 col-span-1">
+```go
+// 很显然，Point 类型的切片可以传递给 Scale
+// 我们希望对 p 进行 Scale，得到一个新的 p，
+// 但发现返回的 r 根本不是 Point
 func ScaleAndPrint(p Point) {
 	r := Scale(p, 2)
-	fmt.Println(r.String())
+	fmt.Println(r.String()) // r.String undefined (type []int32 has no field or method String)
 }
 
 func main() {
@@ -268,15 +288,11 @@ func main() {
 }
 ```
 
-</div>
-<div class="mt-8 col-span-1">
-
-左边的代码会报错：
-
-r.String undefined (type []int32 has no field or method String)。
-
 <div v-click>
 ```go
+// 加入了泛型 S，以及额外的类型约束 ~[]E
+// 调用 Scale 时，不需要 r := Scale[Point, int32](p, 2)，
+// 因为 Go 会进行类型推断
 func Scale[S ~[]E, E constraints.Integer](s S, c E) S {
 	r := make(S, len(s))
 	for i, v := range s {
@@ -319,13 +335,11 @@ func (q *Querier) All[T any](ctx context) ([]T, error) { return nil, nil } // me
 type Querier[T any] struct {
 	client *Client
 }
-
 func NewQuerier[T any](c *Client) *Querier[T] {
   return &Querier[T]{ 
     client: c
   }
 }
-
 func (q *Querier[T]) All(ctx context.Context) ([]T, error) {return nil, nil}
 ```
 
