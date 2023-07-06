@@ -470,7 +470,7 @@ GC Shape这种技术就是通过对类型的底层内存布局（从内存分配
 ### 
 
 <div class="grid grid-cols-10 gap-x-4">
-<div class="mt-2 col-span-2">
+<div class="mt-5 col-span-2">
 <img src="gcshape5.png">
 </div>
 <div class="mt-0 col-span-8">
