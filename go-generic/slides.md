@@ -494,4 +494,3 @@ class: text-center pb-5
 ---
 
 # THANKS!
-go install loov.dev/lensm@main
