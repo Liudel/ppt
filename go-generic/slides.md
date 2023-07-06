@@ -216,20 +216,20 @@ func min[T Order](x, y T) T {
 ---
 
 根据 Go 的规则，类型 P、Q、R 方法中包含了 a、b、c，因此它们实现了接口
-<img src="gophercon01.png">
+<img src="method-sets.png">
 
 ---
 
 反过来可以说，接口也定义了类型集（type sets）
 
 类型 P、Q、R 都实现了左边的接口（因为都实现了接口的方法集），因此我们可以说该接口定义了类型集。
-<img src="gophercon02.png">
+<img src="type-sets.png">
 
 ---
 
 既然接口是定义类型集，只不过是间接定义的：类型实现接口的方法集。而类型约束是类型集，因此完全可以重用接口的语义，只不过这次是直接定义类型集：
 
-<img src="gophercon03.png">
+<img src="type-sets-2.png">
 
 ---
 layout: center
@@ -240,8 +240,12 @@ layout: center
 
 ---
 
+## 3、类型推断
+
 <div class="grid grid-cols-2 gap-x-4">
-<div class="mt-8 col-span-1">
+<div class="col-span-1">
+
+
 ```go
 // 在调用泛型函数时，提供类型实参感觉有点多余。
 // Go 虽然是静态类型语言，但擅长类型推断。
@@ -250,6 +254,8 @@ layout: center
 var a, b, m int
 m = min(a, b)
 ```
+
+<div v-click>
 ```go
 // 这个函数的目的是希望对 s 中的每个元素都乘以参数 c，
 // 最后返回一个新的切片。
@@ -261,6 +267,8 @@ func Scale[E constraints.Integer](s []E, c E) []E {
 	return r
 }
 ```
+</div>
+<div v-click>
 
 ```go
 // 定义一个结构体
@@ -270,9 +278,12 @@ func (p Point) String() string {
 	return "point"
 }
 ```
+</div>
 
 </div>
-<div class="mt-8 col-span-1">
+<div class="col-span-1">
+<div v-click>
+
 ```go
 // 很显然，Point 类型的切片可以传递给 Scale
 // 我们希望对 p 进行 Scale，得到一个新的 p，
@@ -287,8 +298,10 @@ func main() {
 	ScaleAndPrint(p)
 }
 ```
+</div>
 
 <div v-click>
+
 ```go
 // 加入了泛型 S，以及额外的类型约束 ~[]E
 // 调用 Scale 时，不需要 r := Scale[Point, int32](p, 2)，
@@ -318,7 +331,7 @@ layout: center
 # 4.1、不支持泛型方法
 ## 
 
-主要原因Go泛型的处理是在编译的时候实现的，泛型方法在编译的时候，如果没有上下文的分析推断，很难判断泛型方案该如何实例化，甚至判断不了，导致目前(Go 1.18)Go实现中不支持泛型方案
+主要原因Go泛型的处理是在编译的时候实现的，泛型方法在编译的时候，如果没有上下文的分析推断，很难判断泛型方案该如何实例化，甚至判断不了，导致目前Go实现中不支持泛型方法：
 
 ```go
 type StudentModel struct{}
@@ -343,7 +356,7 @@ func NewQuerier[T any](c *Client) *Querier[T] {
 func (q *Querier[T]) All(ctx context.Context) ([]T, error) {return nil, nil}
 ```
 
---- 
+---
 
 <div class="grid grid-cols-2 gap-x-4">
 <div class="mt-8 col-span-1">
@@ -399,8 +412,86 @@ func CheckSIdentity() {
 
 ---
 layout: center
+
+---
+
+# 4、go泛型的实现
+
+---
+
+# 4.1 实现泛型的方式
+### 
+
+<img src="generic.png">
+
+- ##### 字典(Dictionary)
+编译器在编译泛型函数时只生成了一份函数副本，通过新增一个字典参数来供调用方传递类型参数(Type Parameters)，这种实现方式称为字典传递(Dictionary passing)。
+
+- ##### 蜡印(Stenciling)
+GC Shape这种技术就是通过对类型的底层内存布局（从内存分配器或垃圾回收器的视角）分组，对拥有相同的类型内存布局的类型参数进行蜡印，这样就可以避免生成大量重复的代码。
+
+<!--
+单态化由 C++、Rust 和 D 等编程语言使用。进行单态化最直接的方法之一是多次复制代码以实现不同的类型具体化——将多态转换为具体函数。这可以提高运行时性能，但会产生编译时成本，并可能产生臃肿的二进制文件。
+
+在装箱中，“值”被装箱并作为多态类型的引用传递，通常使用指针表，通常称为虚拟表。这就是Go的接口的实现方式。这通常会生成较小的二进制文件，并且需要较短的编译时间，但可能会影响运行时性能。
+-->
+
+---
+
+# 4.2 两个具体类型具有相同的基础类型
+### 
+
+<div class="grid grid-cols-10 gap-x-4">
+<div class="mt-2 col-span-2">
+<img src="gcshape1.png">
+</div>
+<div class="mt-4 col-span-8">
+<img src="gcshape2.png">
+</div>
+</div>
+
+---
+
+# 4.3 两个具体类型具有不同的基础类型
+### 
+
+<div class="grid grid-cols-10 gap-x-4">
+<div class="mt-2 col-span-2">
+<img src="gcshape3.png">
+</div>
+<div class="mt-8 col-span-8">
+<img src="gcshape4.png">
+</div>
+</div>
+
+---
+
+# 4.4 两个具体类型的指针
+### 
+
+<div class="grid grid-cols-10 gap-x-4">
+<div class="mt-2 col-span-2">
+<img src="gcshape5.png">
+</div>
+<div class="mt-0 col-span-8">
+<img src="gcshape6.png">
+</div>
+</div>
+
+---
+
+# 参考
+
+- https://go.dev/blog/intro-generics
+- https://changkun.de/research/talks/generics118.pdf
+- https://deepsource.com/blog/go-1-18-generics-implementation
+- https://mytechshares.com/2022/05/01/generics-can-make-your-go-code-slower/
+
+---
+layout: center
 class: text-center pb-5
 
 ---
 
 # THANKS!
+go install loov.dev/lensm@main
