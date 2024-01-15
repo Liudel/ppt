@@ -363,10 +363,12 @@ nsenter --net=/run/netns/netns0 \
 
 ##### 开启NAT
 ```shell
+# 外部访问
 iptables -t nat -A PREROUTING \
   -d 198.19.249.243 -p tcp -m tcp --dport 5000 \
   -j DNAT --to-destination 192.168.56.10:5000
 
+# 内部访问
 iptables -t nat -A OUTPUT \
   -d 198.19.249.243 -p tcp -m tcp --dport 5000 \
   -j DNAT --to-destination 192.168.56.10:5000
