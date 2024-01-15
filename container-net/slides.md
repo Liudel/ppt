@@ -327,6 +327,54 @@ sudo nsenter --net=/run/netns/netns1 \
 <img src="public/SCR-20240115-qofo.png" class="w-1/2"> 
 
 ---
+
+# 10、与外界联系
+
+##### 目前我们只是跟主机通信，我们想要访问互联网，还需要做一些操作
+
+1、打开ipv4转发功能
+```shell
+echo 1 > /proc/sys/net/ipv4/ip_forward
+```
+
+2、开启nat
+```shell
+sudo iptables -t nat -A POSTROUTING -s 192.168.56.0/24 ! -o br0 -j MASQUERADE
+```
+
+<img src="public/SCR-20240115-qxvx.png">
+
+---
+
+# 10、与外界联系概览
+
+<img src="public/SCR-20240115-qzdq.png" class="w-2/3 m-auto">
+
+
+---
+
+# 11、外界访问内部命名空间
+
+##### 我们启动一个内部服务：
+```shell
+nsenter --net=/run/netns/netns0 \
+  python3 -m http.server --bind 0.0.0.0 5000
+```
+
+##### 开启NAT
+```shell
+iptables -t nat -A PREROUTING \
+  -d 198.19.249.243 -p tcp -m tcp --dport 5000 \
+  -j DNAT --to-destination 192.168.56.10:5000
+
+iptables -t nat -A OUTPUT \
+  -d 198.19.249.243 -p tcp -m tcp --dport 5000 \
+  -j DNAT --to-destination 192.168.56.10:5000
+```
+
+<img src="public/SCR-20240115-rciy.png" class="w-1/3 m-auto">
+
+---
 layout: center
 
 ---
